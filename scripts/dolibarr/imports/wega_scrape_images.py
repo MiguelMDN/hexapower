@@ -11,16 +11,24 @@ from typing import List, Optional, Tuple
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from tqdm import tqdm
 
 load_dotenv()
 
-DEFAULT_UA = os.getenv("HTTP_USER_AGENT", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+DEFAULT_UA = os.getenv(
+    "HTTP_USER_AGENT",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+)
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", "20"))
 REQUEST_RETRY = int(os.getenv("REQUEST_RETRY", "3"))
 REQUEST_SLEEP = float(os.getenv("REQUEST_SLEEP", "0.8"))
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".webp")
+
+@dataclass
+class ProductRow:
+    ref: str
+    url: str
+
 
 def read_csv(path: str) -> List[ProductRow]:
     rows: List[ProductRow] = []
@@ -34,6 +42,7 @@ def read_csv(path: str) -> List[ProductRow]:
             rows.append(ProductRow(ref=ref, url=url))
     return rows
 
+
 def session() -> requests.Session:
     s = requests.Session()
     s.headers.update({
@@ -43,12 +52,13 @@ def session() -> requests.Session:
     })
     return s
 
+
 def request_with_retries(s: requests.Session, method: str, url: str, **kwargs) -> requests.Response:
-    last_exc = None
+    last_exc: Optional[Exception] = None
     for i in range(REQUEST_RETRY):
         try:
             resp = s.request(method, url, timeout=REQUEST_TIMEOUT, **kwargs)
-            if resp.status_code >= 500:
+            if resp.status_code in (429,) or resp.status_code >= 500:
                 time.sleep(REQUEST_SLEEP * (i + 1))
                 continue
             return resp
@@ -58,6 +68,7 @@ def request_with_retries(s: requests.Session, method: str, url: str, **kwargs) -
     if last_exc:
         raise last_exc
     raise RuntimeError("request failed without exception")
+
 
 def find_image_candidates(html: str, base_url: str) -> List[str]:
     soup = BeautifulSoup(html, "lxml")
@@ -73,11 +84,11 @@ def find_image_candidates(html: str, base_url: str) -> List[str]:
         if l.get("href"):
             cands.append(l["href"]) 
 
-    # 3) Common product img classes/ids
+    # 3) Common product image selectors
     img_selectors = [
         "img#product", "img.product", "img.product-image", "img.wp-post-image",
-        "img.attachment-shop_single", "img.zoomImg", "img.zoomImg, img.elevatezoom", "img.primary-photo",
-        "img[class*='product']", "img[data-zoom-image]"
+        "img.attachment-shop_single", "img.zoomImg", "img.elevatezoom",
+        "img.primary-photo", "img[class*='product']", "img[data-zoom-image]"
     ]
     for sel in img_selectors:
         for img in soup.select(sel):
@@ -85,37 +96,40 @@ def find_image_candidates(html: str, base_url: str) -> List[str]:
             if src:
                 cands.append(src)
 
-    # 4) Fallback: any image on page
+    # 4) Fallback: any <img>
     if not cands:
         for img in soup.find_all("img"):
             src = img.get("src") or img.get("data-src")
             if src:
                 cands.append(src)
 
-    # Normalize and filter
-    norm = []
+    # Normalize, filter by image extensions, deduplicate preserving order
+    norm: List[str] = []
     for u in cands:
         u = u.strip()
         if not u:
             continue
         absu = urllib.parse.urljoin(base_url, u)
-        if any(absu.lower().endswith(ext) for ext in IMG_EXTS):
+        if any(absu.lower().split("?")[0].endswith(ext) for ext in IMG_EXTS):
             norm.append(absu)
-    # de-dup while preserving order
+
     seen = set()
-    uniq = []
+    uniq: List[str] = []
     for u in norm:
         if u not in seen:
             seen.add(u)
             uniq.append(u)
     return uniq
 
+
 def filename_for(ref: str, url: str, idx: int) -> str:
-    ext = os.path.splitext(urllib.parse.urlparse(url).path)[1].lower() or ".jpg"
+    path = urllib.parse.urlparse(url).path
+    ext = os.path.splitext(path)[1].lower() or ".jpg"
     clean_ref = re.sub(r"[^A-Za-z0-9_.-]", "-", ref)
     if idx == 0:
         return f"{clean_ref}{ext}"
     return f"{clean_ref}_{idx+1}{ext}"
+
 
 def download_file(s: requests.Session, url: str, out_path: str) -> Tuple[bool, Optional[str]]:
     try:
@@ -130,30 +144,37 @@ def download_file(s: requests.Session, url: str, out_path: str) -> Tuple[bool, O
     except Exception as e:
         return False, str(e)
 
+
 def main():
     ap = argparse.ArgumentParser(description="Scraper de imágenes Wega a partir de CSV (ref,url)")
     ap.add_argument("--input-csv", required=True, help="CSV con columnas ref,url")
-    ap.add_argument("--out-dir", default="wega_images", help="Directorio de salida de imágenes")
+    ap.add_argument("--out-dir", default="data/wega_images", help="Directorio de salida de imágenes")
     ap.add_argument("--max-per-product", type=int, default=3, help="Máximo de imágenes por producto")
     ap.add_argument("--sleep", type=float, default=REQUEST_SLEEP, help="Espera entre requests")
     args = ap.parse_args()
 
     rows = read_csv(args.input_csv)
+    if not rows:
+        print("No se encontraron filas válidas en el CSV (se esperan columnas ref,url)")
+        return
+
     s = session()
 
     total_downloaded = 0
-    errors = []
+    errors: List[Tuple[str, str]] = []
 
-    for row in tqdm(rows, desc="Productos"):
+    for row in rows:
         try:
             resp = request_with_retries(s, "GET", row.url)
             if resp.status_code != 200:
                 errors.append((row.ref, f"HTTP {resp.status_code}"))
+                time.sleep(args.sleep)
                 continue
             html = resp.text
             imgs = find_image_candidates(html, row.url)
             if not imgs:
                 errors.append((row.ref, "No se encontraron imágenes"))
+                time.sleep(args.sleep)
                 continue
             for idx, img_url in enumerate(imgs[: args.max_per_product]):
                 fname = filename_for(row.ref, img_url, idx)
