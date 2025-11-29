@@ -1,0 +1,15 @@
+openapi: 3.0.1
+info:
+  title: HexaPower Actions
+  description: API mínima de prueba para validar importador de OpenAI.
+  version: 1.0.0
+servers:
+  - url: "https://hexapower.com.ar/api/gpt"
+paths:
+  /ping:
+    get:
+      operationId: ping
+      summary: Prueba de conectividad.
+      responses:
+        "200":
+          description: OK
