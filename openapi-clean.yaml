@@ -1,0 +1,266 @@
+openapi: 3.0.1
+info:
+  title: Acciones Profesor IA Híbrido
+  description: Acciones para el profesor de IA de Miguel sobre hexapower.com.ar/api/gpt.
+  version: 1.0.0
+
+servers:
+  - url: "https://hexapower.com.ar/api/gpt"
+    description: API propia en tu hosting.
+
+paths:
+
+  /guardar_notas:
+    post:
+      operationId: guardar_notas
+      summary: Guarda notas, ejercicios o resúmenes de estudio.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                titulo:
+                  type: string
+                contenido:
+                  type: string
+              required:
+                - titulo
+                - contenido
+      responses:
+        "200":
+          description: Notas guardadas correctamente.
+
+  /listar_notas:
+    get:
+      operationId: listar_notas
+      summary: Lista los archivos de notas disponibles.
+      responses:
+        "200":
+          description: Lista de notas recuperada correctamente.
+
+  /obtener_nota:
+    get:
+      operationId: obtener_nota
+      summary: Obtiene el contenido de una nota específica.
+      parameters:
+        - in: query
+          name: id
+          schema:
+            type: string
+          required: true
+          description: Nombre del archivo de notas (ej. 'notas_20251128.txt').
+      responses:
+        "200":
+          description: Nota recuperada correctamente.
+
+  /generar_archivo_python:
+    post:
+      operationId: generar_archivo_python
+      summary: Genera un archivo .py con código Python.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre_archivo:
+                  type: string
+                contenido:
+                  type: string
+              required:
+                - nombre_archivo
+                - contenido
+      responses:
+        "200":
+          description: Archivo .py generado correctamente.
+
+  /crear_dataset_csv:
+    post:
+      operationId: crear_dataset_csv
+      summary: Genera un dataset CSV sintético.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre:
+                  type: string
+                columnas:
+                  type: array
+                  items:
+                    type: string
+                filas:
+                  type: integer
+              required:
+                - nombre
+                - columnas
+                - filas
+      responses:
+        "200":
+          description: Dataset CSV generado correctamente.
+
+  /registrar_progreso:
+    post:
+      operationId: registrar_progreso
+      summary: Registra el progreso de Miguel en un tema.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tema:
+                  type: string
+                nivel_percibido:
+                  type: string
+                puntaje:
+                  type: number
+                notas:
+                  type: string
+              required:
+                - tema
+                - nivel_percibido
+      responses:
+        "200":
+          description: Progreso registrado correctamente.
+
+  /obtener_progreso:
+    get:
+      operationId: obtener_progreso
+      summary: Recupera el progreso registrado.
+      parameters:
+        - in: query
+          name: tema
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          description: Progreso recuperado correctamente.
+
+  /crear_tarea:
+    post:
+      operationId: crear_tarea
+      summary: Crea una tarea de estudio o trabajo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                titulo:
+                  type: string
+                descripcion:
+                  type: string
+                fecha_limite:
+                  type: string
+                categoria:
+                  type: string
+              required:
+                - titulo
+                - descripcion
+      responses:
+        "200":
+          description: Tarea creada correctamente.
+
+  /listar_tareas:
+    get:
+      operationId: listar_tareas
+      summary: Lista tareas existentes.
+      parameters:
+        - in: query
+          name: estado
+          schema:
+            type: string
+          required: false
+          description: pendiente, en_progreso, completada o todas.
+      responses:
+        "200":
+          description: Lista de tareas recuperada correctamente.
+
+  /actualizar_tarea:
+    post:
+      operationId: actualizar_tarea
+      summary: Actualiza el estado o notas de una tarea.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                estado:
+                  type: string
+                notas:
+                  type: string
+              required:
+                - id
+      responses:
+        "200":
+          description: Tarea actualizada correctamente.
+
+  /crear_proyecto:
+    post:
+      operationId: crear_proyecto
+      summary: Crea un proyecto de IA o desarrollo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre:
+                  type: string
+                descripcion:
+                  type: string
+                objetivos:
+                  type: string
+                area:
+                  type: string
+              required:
+                - nombre
+                - descripcion
+      responses:
+        "200":
+          description: Proyecto creado correctamente.
+
+  /listar_proyectos:
+    get:
+      operationId: listar_proyectos
+      summary: Lista proyectos existentes.
+      responses:
+        "200":
+          description: Lista de proyectos recuperada correctamente.
+
+  /actualizar_proyecto:
+    post:
+      operationId: actualizar_proyecto
+      summary: Actualiza estado o notas de un proyecto.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                estado:
+                  type: string
+                notas:
+                  type: string
+              required:
+                - id
+      responses:
+        "200":
+          description: Proyecto actualizado correctamente.
